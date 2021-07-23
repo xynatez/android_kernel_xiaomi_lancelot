@@ -334,6 +334,7 @@ static int mark_idle(struct zram *zram, unsigned long long threshold)
 		 * See the comment in writeback_store.
 		 */
 		zram_slot_lock(zram, index);
+#ifdef CONFIG_ZRAM_MEMORY_TRACKING
 		if (zram_allocated(zram, index) &&
 				!zram_test_flag(zram, index, ZRAM_UNDER_WB) &&
 				!zram_test_flag(zram, index, ZRAM_WB) &&
@@ -344,6 +345,7 @@ static int mark_idle(struct zram *zram, unsigned long long threshold)
 			zram_set_flag(zram, index, ZRAM_IDLE);
 			ret++;
 		}
+#endif
 		zram_slot_unlock(zram, index);
 	}
 
