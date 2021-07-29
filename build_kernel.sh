@@ -3,7 +3,9 @@
 # simple build scripts for compiling kernel on this repo
 # supported config: merlin, lancelot
 # toolchain used: proton clang-13
-# note: change telegram CHATID to yours
+# note:
+# change telegram CHATID to yours
+# change OUTDIR if needed, by default its using /root directory
 
 ##------------------------------------------------------##
 
@@ -69,10 +71,10 @@ tg_post_build() {
 ##----------------------------------------------------------------##
 
 zipping() {
-  cd /root/AnyKernel || exit 1
+  cd "$OUTDIR"/AnyKernel || exit 1
   rm *.zip *-dtb *dtbo.img
-  cp /root/arch/arm64/boot/Image.gz-dtb .
-# cp /root/arch/arm64/boot/dtbo.img .
+  cp "$OUTDIR"/arch/arm64/boot/Image.gz-dtb .
+# cp "$OUTDIR"/arch/arm64/boot/dtbo.img .
   zip -r9 "$ZIPNAME"-"${DATE}".zip *
   cd - || exit
 }
@@ -81,8 +83,8 @@ zipping() {
 
 build_kernel() {
   echo "-GenomLTO-OSS-R-$CONFIG" > localversion
-  make O=/root ARCH=arm64 "$DEFCONFIG"
-  make -j"$PROCS" O=/root \
+  make O="$OUTDIR" ARCH=arm64 "$DEFCONFIG"
+  make -j"$PROCS" O="$OUTDIR" \
                   ARCH=arm64 \
                   CC=clang \
                   CROSS_COMPILE=aarch64-linux-gnu- \
@@ -91,12 +93,14 @@ build_kernel() {
 
 ##----------------------------------------------------------------##
 
+export OUTDIR=/root
+
 if [[ $CLONE == true ]]
 then
   echo "Cloning dependencies"
-  mkdir /root/clang-llvm
-  git clone https://github.com/kdrag0n/proton-clang --depth=1 /root/clang-llvm
-  git clone https://github.com/rama982/AnyKernel3 --depth=1 /root/AnyKernel
+  mkdir "$OUTDIR"/clang-llvm
+  git clone https://github.com/kdrag0n/proton-clang --depth=1 "$OUTDIR"/clang-llvm
+  git clone https://github.com/rama982/AnyKernel3 --depth=1 "$OUTDIR"/AnyKernel
 fi
 
 #telegram env
@@ -109,11 +113,11 @@ export DEFCONFIG=$CONFIG"_defconfig"
 export TZ="Asia/Jakarta"
 export KERNEL_DIR=$(pwd)
 export ZIPNAME="Genom-OSS-$CONFIG-BETA"
-export IMAGE="/root/arch/arm64/boot/Image.gz-dtb"
+export IMAGE="${OUTDIR}/arch/arm64/boot/Image.gz-dtb"
 export DATE=$(date "+%Y%m%d-%H%M")
 export BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-export PATH="/root/clang-llvm/bin:${PATH}"
-export KBUILD_COMPILER_STRING="$(/root/clang-llvm/bin/clang --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g')"
+export PATH="${OUTDIR}/clang-llvm/bin:${PATH}"
+export KBUILD_COMPILER_STRING="$(${OUTDIR}/clang-llvm/bin/clang --version | head -n 1 | perl -pe 's/\(http.*?\)//gs' | sed -e 's/  */ /g')"
 export KBUILD_BUILD_HOST=$(uname -a | awk '{print $2}')
 export ARCH=arm64
 export KBUILD_BUILD_USER=rama982
@@ -147,11 +151,11 @@ DIFF=$((BUILD_END - BUILD_START))
 if [[ -f $IMAGE ]]
 then
   zipping
-  ZIPFILE=$(ls /root/AnyKernel/*.zip)
+  ZIPFILE=$(ls "$OUTDIR"/AnyKernel/*.zip)
   MD5CHECK=$(md5sum "$ZIPFILE" | cut -d' ' -f1)
   tg_post_build "$ZIPFILE" "
 <b>Build took : </b>$((DIFF / 60)) minute(s) and $((DIFF % 60)) second(s)
-<b>Compiler: </b>$(grep LINUX_COMPILER /root/include/generated/compile.h  |  sed -e 's/.*LINUX_COMPILER "//' -e 's/"$//')
+<b>Compiler: </b>$(grep LINUX_COMPILER ${OUTDIR}/include/generated/compile.h  |  sed -e 's/.*LINUX_COMPILER "//' -e 's/"$//')
 <b>MD5 Checksum : </b><code>$MD5CHECK</code>
 "
 else
