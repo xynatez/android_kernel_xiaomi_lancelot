@@ -11,10 +11,11 @@
 
 Help()
 {
-  echo "Usage: [--help|-h|-?] [--clone|-c] [--nolto|-n]" 
+  echo "Usage: [--help|-h|-?] [--clone|-c] [--no-lto] [--dtbo]"
   echo "$0 <defconfig> <token> [Other Args]"
   echo -e "\t--clone: Clone compiler"
-  echo -e "\t--nolto: Disable Clang LTO"
+  echo -e "\t--no-lto: Disable Clang LTO"
+  echo -e "\t--dtbo: Include dtbo.img"
   echo -e "\t--help: To show this info"
 }
 
@@ -30,8 +31,12 @@ case $key in
   CLONE=true
   shift
   ;;
-  --nolto|-n)
+  --no-lto)
   NOLTO=true
+  shift
+  ;;
+  --dtbo)
+  DTBO=true
   shift
   ;;
   --help|-h|-?)
@@ -60,6 +65,7 @@ echo
 echo "Using defconfig: ""$CONFIG""_defconfig"
 echo "Clone dependencies: $([[ ! -z "$CLONE" ]] && echo "true" || echo "false")"
 echo "Disable LTO Clang: $([[ ! -z "$NOLTO" ]] && echo "true" || echo "false")"
+echo "Include dtbo.img: $([[ ! -z "$DTBO" ]] && echo "true" || echo "false")"
 echo
 read -p "Are you sure? " -n 1 -r
 ! [[ $REPLY =~ ^[Yy]$ ]] && exit
@@ -89,7 +95,7 @@ zipping() {
   cd "$OUTDIR"/AnyKernel || exit 1
   rm *.zip *-dtb *dtbo.img
   cp "$OUTDIR"/arch/arm64/boot/Image.gz-dtb .
-  cp "$OUTDIR"/arch/arm64/boot/dtbo.img .
+  [[ $DTBO == true ]] && cp "$OUTDIR"/arch/arm64/boot/dtbo.img .
   zip -r9 "$ZIPNAME"-"${DATE}".zip *
   cd - || exit
 }
@@ -97,7 +103,9 @@ zipping() {
 ##----------------------------------------------------------------##
 
 build_kernel() {
+  [[ $NOLTO == true ]] && sed -ir 's/^CONFIG_LTO_CLANG=.*/CONFIG_LTO_CLANG=n/' arch/arm64/configs/"$DEFCONFIG"
   echo "-GenomLTO-OSS-R-$CONFIG" > localversion
+  make O="$OUTDIR" ARCH=arm64 clean
   make O="$OUTDIR" ARCH=arm64 "$DEFCONFIG"
   make -j"$PROCS" O="$OUTDIR" \
                   ARCH=arm64 \
@@ -127,7 +135,7 @@ BOT_BUILD_URL="https://api.telegram.org/bot$TOKEN/sendDocument"
 export DEFCONFIG=$CONFIG"_defconfig"
 export TZ="Asia/Jakarta"
 export KERNEL_DIR=$(pwd)
-export ZIPNAME="Genom-OSS-$CONFIG-BETA"
+export ZIPNAME="Genom-OSS-R-$CONFIG-BETA"
 export IMAGE="${OUTDIR}/arch/arm64/boot/Image.gz-dtb"
 export DATE=$(date "+%Y%m%d-%H%M")
 export BRANCH="$(git rev-parse --abbrev-ref HEAD)"
@@ -152,8 +160,6 @@ Build is started
 <b>Branch : </b>$BRANCH
 <b>Top Commit : </b>$COMMIT_HEAD
 "
-
-[[ $NOLTO == true ]] && sed -ir 's/^CONFIG_LTO_CLANG=.*/CONFIG_LTO_CLANG=n/' arch/arm64/configs/"$DEFCONFIG"
 
 BUILD_START=$(date +"%s")
 
