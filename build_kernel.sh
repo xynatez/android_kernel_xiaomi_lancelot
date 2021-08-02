@@ -11,34 +11,49 @@
 
 Help()
 {
-  echo "options:"
-  echo "h     display this help"
-  echo "d     name of *_defconfig file."
-  echo "c     clone compiler."
-  echo "n     disable CLANG LTO."
-  echo "t     telegram bot token."
-  echo
+  echo "Usage: [--help|-h|-?] [--clone|-c] [--nolto|-n]" 
+  echo "$0 <defconfig> <token> [Other Args]"
+  echo -e "\t--clone: Clone compiler"
+  echo -e "\t--nolto: Disable Clang LTO"
+  echo -e "\t--help: To show this info"
 }
 
 ##------------------------------------------------------##
 
-while getopts "hd:cnt:" option; do
-  case $option in
-    h) Help
-       exit;;
-    d) CONFIG=$OPTARG;;
-    c) CLONE=true;;
-    n) NOLTO=true;;
-    t) TOKEN=$OPTARG;;
-   \?) echo "Error: Invalid option"
-       exit;;
-  esac
-done
+POSITIONAL=()
+while [[ $# -gt 0 ]]
+do
+key="$1"
 
-if [ -z "$CONFIG" ] || [ -z "$TOKEN" ]; then
-  echo 'Missing -d -t' >&2
-  exit 1
+case $key in
+  --clone|-c)
+  CLONE=true
+  shift
+  ;;
+  --nolto|-n)
+  NOLTO=true
+  shift
+  ;;
+  --help|-h|-?)
+  Help
+  exit
+  ;;
+  *)
+  POSITIONAL+=("$1")
+  shift
+  ;;
+esac
+done
+set -- "${POSITIONAL[@]}" # restore positional parameters
+
+if [[ ! -n $2 ]]; then
+  echo "ERROR: Enter all needed parameters"
+  usage
+  exit
 fi
+
+CONFIG=$1
+TOKEN=$2
 
 echo "This is your setup config"
 echo
@@ -74,7 +89,7 @@ zipping() {
   cd "$OUTDIR"/AnyKernel || exit 1
   rm *.zip *-dtb *dtbo.img
   cp "$OUTDIR"/arch/arm64/boot/Image.gz-dtb .
-# cp "$OUTDIR"/arch/arm64/boot/dtbo.img .
+  cp "$OUTDIR"/arch/arm64/boot/dtbo.img .
   zip -r9 "$ZIPNAME"-"${DATE}".zip *
   cd - || exit
 }
@@ -130,7 +145,6 @@ export KERVER=$(make kernelversion)
 tg_post_msg "
 Build is started
 <b>OS: </b>$DISTRO
-<b>Kernel Version : </b>$KERVER
 <b>Date : </b>$(date)
 <b>Device : </b>$CONFIG
 <b>Host : </b>$KBUILD_BUILD_HOST
@@ -155,7 +169,9 @@ then
   MD5CHECK=$(md5sum "$ZIPFILE" | cut -d' ' -f1)
   tg_post_build "$ZIPFILE" "
 <b>Build took : </b>$((DIFF / 60)) minute(s) and $((DIFF % 60)) second(s)
+<b>Kernel Version : </b>$KERVER
 <b>Compiler: </b>$(grep LINUX_COMPILER ${OUTDIR}/include/generated/compile.h  |  sed -e 's/.*LINUX_COMPILER "//' -e 's/"$//')
+<b>Disable LTO Clang: </b>$([[ ! -z "$NOLTO" ]] && echo "true" || echo "false")
 <b>MD5 Checksum : </b><code>$MD5CHECK</code>
 "
 else
