@@ -374,7 +374,7 @@ static int init_lru_writeback(struct zram *zram)
 	}
 
 	g_zram = zram;
-	zram->wb_limit_enable = true;
+	zram->wb_limit_enable = false;
 	sched_setscheduler(zram->wbd, SCHED_IDLE, &param);
 
 	return ret;
